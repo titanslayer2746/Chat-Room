@@ -2,7 +2,7 @@ import express from "express";
 import dotenv from "dotenv"
 import connectDB from "./db/index.js";
 import authRouter from './routes/auth.route.js';
-import userRouter from './routes/user.route.js'
+import userRouter from './routes/user.route.js';
 import bodyParser from "body-parser";
 import cookieParser from "cookie-parser";
 
