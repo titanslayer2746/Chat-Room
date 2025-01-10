@@ -8,8 +8,11 @@ import { getAllPosts,
          commentOnPost,
          deletePost } from "../controllers/post.controller.js";
 import { protectRoute } from "../middlewares/protectRoute.js";
+
+//DECLARING the router
 const router = express.Router()
 
+//CREATING the routes
 router.post("/create", protectRoute, createPost);
 router.get("/all", protectRoute, getAllPosts);
 router.post("/like/:id", protectRoute, likeUnlikePost);
