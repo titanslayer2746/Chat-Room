@@ -63,7 +63,7 @@ const followUnfollowUser = async (req, res) => {
         const newNotification = new Notification({
             type: "follow",
             from: req.user._id,
-            to: userToModify._id,
+            to: userToFollowUnfollow._id,
         });
 
         await newNotification.save();
@@ -72,7 +72,7 @@ const followUnfollowUser = async (req, res) => {
      }
      
    } catch (error) {
-    console.log("Error in followUnfollow constroller", error)
+    console.log("Error in followUnfollow controller", error)
     return res.status(500).json({error: "Internal Server Error"})
    }
 }
