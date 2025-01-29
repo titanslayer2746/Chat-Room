@@ -7,10 +7,10 @@ import postRouter from './routes/post.route.js';
 import notificationRouter from './routes/notification.route.js';
 import cookieParser from "cookie-parser";
 import { v2 as cloudinary } from "cloudinary";
-
+import path from "path";
 // DOTENV configuration
 dotenv.config({
-    path: "../.env"
+    path: ".env"
 })
 
 //CLOUDINARY configuration
@@ -34,9 +34,7 @@ app.use(cookieParser());
 
 // PORT selection
 const PORT = process.env.PORT || 5000
-
-// DATABASE Connection
-connectDB()
+const __dirname = path.resolve();
 
 // ROUTES handling
 app.use("/api/auth", authRouter)
@@ -44,8 +42,17 @@ app.use('/api/users', userRouter)
 app.use("/api/posts", postRouter);
 app.use("/api/notifications", notificationRouter)
 
+if (process.env.NODE_ENV === "production") {
+	app.use(express.static(path.join(__dirname, "/frontend/dist")));
+
+	app.get("*", (req, res) => {
+		res.sendFile(path.resolve(__dirname, "frontend", "dist", "index.html"));
+	});
+}
+
 // LISTENING to the server
 app.listen(PORT, ()=>{
+	connectDB();
     console.log(`Server listening on port : ${PORT}`)
 })
 
