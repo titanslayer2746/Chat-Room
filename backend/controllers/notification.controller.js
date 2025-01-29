@@ -1,6 +1,6 @@
 import Notification from "../models/notification.model.js";
 
-const getNotifications = async (req, res) => {
+export const getNotifications = async (req, res) => {
 	try {
 		const userId = req.user._id;
 
@@ -18,7 +18,7 @@ const getNotifications = async (req, res) => {
 	}
 };
 
-const deleteNotifications = async (req, res) => {
+export const deleteNotifications = async (req, res) => {
 	try {
 		const userId = req.user._id;
 
@@ -30,6 +30,3 @@ const deleteNotifications = async (req, res) => {
 		res.status(500).json({ error: "Internal Server Error" });
 	}
 };
-
-
-export { getNotifications, deleteNotifications };

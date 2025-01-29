@@ -1,89 +1,72 @@
+import bcrypt from "bcryptjs";
+import { v2 as cloudinary } from "cloudinary";
+
+// models
+import Notification from "../models/notification.model.js";
 import User from "../models/user.model.js";
-import Notification from "../models/notification.model.js"
-import {v2 as cloudinary} from "cloudinary";
-import bcrypt from "bcryptjs"
 
-const getUserProfile = async (req,res) => {
-    const {username} = req.params;
+export const getUserProfile = async (req, res) => {
+	const { username } = req.params;
 
-    try {
-        const user = await User.findOne({username}).select("-password")
+	try {
+		const user = await User.findOne({ username }).select("-password");
+		if (!user) return res.status(404).json({ message: "User not found" });
 
-        if(!user) return res.status(404).json({message: "User not found"});
+		res.status(200).json(user);
+	} catch (error) {
+		console.log("Error in getUserProfile: ", error.message);
+		res.status(500).json({ error: error.message });
+	}
+};
 
-        res.status(200).json(user);
-        
-    } catch (error) {
-        console.log("Error in getUserProfile controller : ", error)
-        return res.status(500).json({error : error.message})
-    }
-}
+export const followUnfollowUser = async (req, res) => {
+	try {
+		const { id } = req.params;
+		const userToModify = await User.findById(id);
+		const currentUser = await User.findById(req.user._id);
 
-const followUnfollowUser = async (req, res) => {
+		if (id === req.user._id.toString()) {
+			return res.status(400).json({ error: "You can't follow/unfollow yourself" });
+		}
 
-   try {
-     const {id} = req.params;
+		if (!userToModify || !currentUser) return res.status(400).json({ error: "User not found" });
 
-     if(id==req.user._id) {
-        res.status(404).json({message: "You cannot follow unfollow yourself"})
-     }
+		const isFollowing = currentUser.following.includes(id);
 
-     const userToFollowUnfollow = await User.findById(id)
-     const currentUser = await User.findById(req.user._id)
+		if (isFollowing) {
+			// Unfollow the user
+			await User.findByIdAndUpdate(id, { $pull: { followers: req.user._id } });
+			await User.findByIdAndUpdate(req.user._id, { $pull: { following: id } });
 
-     if(!userToFollowUnfollow || !currentUser){
-        return res.status(404).json({message: "User not found"})
-     }
+			res.status(200).json({ message: "User unfollowed successfully" });
+		} else {
+			// Follow the user
+			await User.findByIdAndUpdate(id, { $push: { followers: req.user._id } });
+			await User.findByIdAndUpdate(req.user._id, { $push: { following: id } });
+			// Send notification to the user
+			const newNotification = new Notification({
+				type: "follow",
+				from: req.user._id,
+				to: userToModify._id,
+			});
 
-     const isFollowing = currentUser.following.includes(id)
+			await newNotification.save();
 
-     if(isFollowing){
-        //unfollow
-        //remove the value of userToFollowUnfollow id from the following array of current user
+			res.status(200).json({ message: "User followed successfully" });
+		}
+	} catch (error) {
+		console.log("Error in followUnfollowUser: ", error.message);
+		res.status(500).json({ error: error.message });
+	}
+};
 
-        //Method 1
-        await User.findByIdAndUpdate(id, { $pull: { followers: req.user._id } });
-		await User.findByIdAndUpdate(req.user._id, { $pull: { following: id } });
+export const getSuggestedUsers = async (req, res) => {
+	try {
+		const userId = req.user._id;
 
-		res.status(200).json({ message: "User unfollowed successfully" });
+		const usersFollowedByMe = await User.findById(userId).select("following");
 
-        // Method 2
-        // currentUser.following = currentUser.following.filter(follower => follower!=id)
-        // userToFollowUnfollow.followers = userToFollowUnfollow.followers.filter(follower => follower!=req.user._id)
-        // await currentUser.save()
-        // await userToFollowUnfollow.save()
-     }
-     else{
-        //follow
-        //add the value of userToFollowUnfollow id to the following array of current user
-
-        await User.findByIdAndUpdate(id, { $push: { followers: req.user._id } });
-        await User.findByIdAndUpdate(req.user._id, { $push: { following: id } });
-
-        const newNotification = new Notification({
-            type: "follow",
-            from: req.user._id,
-            to: userToFollowUnfollow._id,
-        });
-
-        await newNotification.save();
-
-        res.status(200).json({ message: "User followed successfully" });
-     }
-     
-   } catch (error) {
-    console.log("Error in followUnfollow controller", error)
-    return res.status(500).json({error: "Internal Server Error"})
-   }
-}
-
-const getSuggestedUsers = async (req,res) =>{
-    try {
-        const userId = req.user._id;
-
-        const usersFollowedByCurrentUser = await User.findById(userId).select("following")
-
-        const users = await User.aggregate([
+		const users = await User.aggregate([
 			{
 				$match: {
 					_id: { $ne: userId },
@@ -92,22 +75,20 @@ const getSuggestedUsers = async (req,res) =>{
 			{ $sample: { size: 10 } },
 		]);
 
-		
-		const filteredUsers = users.filter((user) => !usersFollowedByCurrentUser.following.includes(user._id));
+		// 1,2,3,4,5,6,
+		const filteredUsers = users.filter((user) => !usersFollowedByMe.following.includes(user._id));
 		const suggestedUsers = filteredUsers.slice(0, 4);
 
 		suggestedUsers.forEach((user) => (user.password = null));
 
 		res.status(200).json(suggestedUsers);
-        
-    } catch (error) {
-        console.log("Error in suggested users controller", error)
-        return res.status(500).json({error: "Internal Server Error"})
-    }
-}
+	} catch (error) {
+		console.log("Error in getSuggestedUsers: ", error.message);
+		res.status(500).json({ error: error.message });
+	}
+};
 
-
-const updateUser = async (req, res) => {
+export const updateUser = async (req, res) => {
 	const { fullName, email, username, currentPassword, newPassword, bio, link } = req.body;
 	let { profileImg, coverImg } = req.body;
 
@@ -134,6 +115,7 @@ const updateUser = async (req, res) => {
 
 		if (profileImg) {
 			if (user.profileImg) {
+				// https://res.cloudinary.com/dyfqon1v6/image/upload/v1712997552/zmxorcxexpdbh8r0bkjb.png
 				await cloudinary.uploader.destroy(user.profileImg.split("/").pop().split(".")[0]);
 			}
 
@@ -169,5 +151,3 @@ const updateUser = async (req, res) => {
 		res.status(500).json({ error: error.message });
 	}
 };
-
-export {getUserProfile, followUnfollowUser, getSuggestedUsers,updateUser}
